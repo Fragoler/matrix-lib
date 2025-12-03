@@ -4,14 +4,16 @@
 /// <summary>
 /// Template container matrix class NxM with multithreading support.
 /// </summary>
-/// <typeparam name="T">Matrix.Core's element type</typeparam>
+/// <typeparam name="T">Matrix's element type</typeparam>
 public partial class Matrix<T> : IDisposable
     where T : notnull
 {
+    private const uint LocksCount = 16;
+    
     private readonly T[,] _data;
     private readonly uint _rows;
     private readonly uint _columns;
-    private readonly ReaderWriterLockSlim[] _locks = new ReaderWriterLockSlim[16];
+    private readonly ReaderWriterLockSlim[] _locks = new ReaderWriterLockSlim[LocksCount];
     private volatile bool _disposed;
 
     /// <summary>
@@ -20,12 +22,15 @@ public partial class Matrix<T> : IDisposable
     /// <exception cref="ArgumentException">Thrown if at least one argument is not positive</exception>
     public Matrix(uint rows, uint columns)
     {
-        if (rows <= 0 || columns <= 0)
-            throw new ArgumentException($"Matrix.Core's params should be positive. But has: rows={rows}, columns={columns}");
+        if (rows == 0 || columns == 0)
+            throw new ArgumentException($"Matrix's params should be positive. But has: rows={rows}, columns={columns}");
 
         _rows = rows;
         _columns = columns;
         _data = new T[rows, columns];
+
+        for (var i = 0; i < LocksCount; ++i)   
+            _locks[i] = new ReaderWriterLockSlim();
     }
 
     /// <summary>
@@ -44,6 +49,9 @@ public partial class Matrix<T> : IDisposable
             throw new ArgumentException("Array should have any data");
 
         _data = (T[,])data.Clone();
+        
+        for (var i = 0; i < LocksCount; ++i)   
+            _locks[i] = new ReaderWriterLockSlim();
     }
 
     public uint Rows => _rows;
@@ -79,7 +87,7 @@ public partial class Matrix<T> : IDisposable
         ValidateIndices(row, column);
         var @lock = GetElementLock(row, column);
         
-        @lock.EnterReadLock();
+        @lock.EnterWriteLock();
         try
         {
             _data[row, column] = value;
@@ -178,10 +186,10 @@ public partial class Matrix<T> : IDisposable
     public override string ToString()
     {
         if (_disposed)
-            return "[Matrix.Core disposed]";
+            return "[Matrix disposed]";
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"Matrix.Core<{typeof(T).Name}> ({_rows}x{_columns})");
+        var sb = new StringBuilder();
+        sb.AppendLine($"Matrix<{typeof(T).Name}> ({_rows}x{_columns})");
         
         for (uint row = 0; row < _rows; row++)
         {
@@ -214,8 +222,6 @@ public partial class Matrix<T> : IDisposable
         {
             foreach (var @lock in _locks)
                 @lock.Dispose();
-
-            Dispose();
         }
 
         _disposed = true;
@@ -235,7 +241,7 @@ public partial class Matrix<T> : IDisposable
         ThrowIfDisposed();
         ValidateIndices(row, column);
 
-        return _locks[(row + column) % 16];
+        return _locks[(row + column) % LocksCount];
     }
 
     
@@ -254,7 +260,7 @@ public partial class Matrix<T> : IDisposable
     private void ThrowIfDisposed()
     {
         if (_disposed)
-            throw new ObjectDisposedException(nameof(Matrix<T>), "Matrix.Core was disposed");
+            throw new ObjectDisposedException(nameof(Matrix<T>), "Matrix was disposed");
     }
 
 

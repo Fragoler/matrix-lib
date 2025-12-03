@@ -13,7 +13,7 @@ public partial class Matrix<T>
     }
 }
 
-public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>
+public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>, ICloneable
     where T : notnull
 {
     private uint _column = 0, _row = 0;
@@ -42,6 +42,28 @@ public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>
     public void Reset() =>
         _row = _column = 0;
 
+    public IList<T> ToList()
+    {
+        var list = new List<T>();
+
+        var en = (MatrixEnumerator<T>)Clone();
+        do
+        {
+            list.Add(en.Current);
+        } while(en.MoveNext()); 
+        
+        return list;
+    }
+
+
+    public object Clone()
+    {
+        return new MatrixEnumerator<T>(matrix)
+        {
+            _column = _column,
+            _row = _row
+        };
+    }
 
     public void Dispose()
     {
