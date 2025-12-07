@@ -11,92 +11,93 @@ public partial class Matrix<T> : IDisposable
     private const uint LocksCount = 16;
     
     private readonly T[,] _data;
-    private readonly uint _rows;
-    private readonly uint _columns;
-    private readonly ReaderWriterLockSlim[] _locks = new ReaderWriterLockSlim[LocksCount];
+    private readonly uint _width;
+    private readonly uint _height;
+    private readonly ReaderWriterLockSlim _lock = new();
     private volatile bool _disposed;
 
     /// <summary>
-    /// Init matrix rows * columns with default value
+    /// Init matrix width * height with default value
     /// </summary>
     /// <exception cref="ArgumentException">Thrown if at least one argument is not positive</exception>
-    public Matrix(uint rows, uint columns)
+    public Matrix(uint width, uint height)
     {
-        if (rows == 0 || columns == 0)
-            throw new ArgumentException($"Matrix's params should be positive. But has: rows={rows}, columns={columns}");
+        if (width == 0 || height == 0)
+            throw new ArgumentException($"Matrix's params should be positive. But has: width={width}, height={height}");
 
-        _rows = rows;
-        _columns = columns;
-        _data = new T[rows, columns];
-
-        for (var i = 0; i < LocksCount; ++i)   
-            _locks[i] = new ReaderWriterLockSlim();
+        _width = width;
+        _height = height;
+        _data = new T[width, height];
     }
 
     /// <summary>
     /// Init matrix with already init data
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown if data is null</exception>
-    /// <exception cref="ArgumentException">thrown if data has one 0 dimension</exception>
+    /// <exception cref="ArgumentException">Thrown if data has one 0 dimension</exception>
     public Matrix(T[,] data)
     {
         ArgumentNullException.ThrowIfNull(data);
 
-        _rows = Convert.ToUInt32(data.GetLength(0));
-        _columns = Convert.ToUInt32(data.GetLength(1));
+        _width = Convert.ToUInt32(data.GetLength(0));
+        _height = Convert.ToUInt32(data.GetLength(1));
 
-        if (_rows == 0 || _columns == 0)
+        if (_width == 0 || _height == 0)
             throw new ArgumentException("Array should have any data");
 
         _data = (T[,])data.Clone();
-        
-        for (var i = 0; i < LocksCount; ++i)   
-            _locks[i] = new ReaderWriterLockSlim();
     }
-
-    public uint Rows => _rows;
-    public uint Columns => _columns;
+    
+    
+    public uint Width => _width;
+    public uint Height => _height;
+    
 
     /// <summary>
     /// Get element
     /// </summary>
     /// <exception cref="IndexOutOfRangeException"></exception>
-    public T Get(uint row, uint column)
+    public T Get(uint x, uint y)
     {
         ThrowIfDisposed();
-        ValidateIndices(row, column);
-        var @lock = GetElementLock(row, column);
+        ValidateIndices(x, y);
         
-        @lock.EnterReadLock();
+        _lock.EnterReadLock();
         try
         {
-            return _data[row, column];
+            return _data[x, y];
         }
         finally
         {
-            @lock.ExitReadLock();
+            _lock.ExitReadLock();
         }
     }
     
     /// <summary>
     /// Set element 
     /// </summary>
-    public void Set(uint row, uint column, T value)
+    public void Set(uint x, uint y, T value)
     {
         ThrowIfDisposed();
-        ValidateIndices(row, column);
-        var @lock = GetElementLock(row, column);
-        
-        @lock.EnterWriteLock();
+        ValidateIndices(x, y);
+
+        _lock.EnterWriteLock();
         try
         {
-            _data[row, column] = value;
+            _data[x, y] = value;
         }
         finally
         {
-            @lock.ExitWriteLock();
+            _lock.ExitWriteLock();
         }
     }
+    
+    public T this[uint x, uint y]
+    {
+        get => Get(x, y);
+        set => Set(x, y, value);
+    }
+    
     
     /// <summary>
     /// Fill async
@@ -106,11 +107,11 @@ public partial class Matrix<T> : IDisposable
         ThrowIfDisposed();
 
         var tasks = new List<Task>();
-        for (uint row = 0; row < _rows; row++)
+        for (uint x = 0; x < _width; x++)
         {
-            for (uint col = 0; col < _columns; col++)
+            for (uint col = 0; col < _height; col++)
             {
-                uint r = row, c = col;
+                uint r = x, c = col;
                 
                 tasks.Add(Task.Run(() =>
                 {
@@ -122,7 +123,7 @@ public partial class Matrix<T> : IDisposable
 
         await Task.WhenAll(tasks).ConfigureAwait(false);
     }
-
+    
     /// <summary>
     /// For each do action
     /// </summary>
@@ -131,11 +132,11 @@ public partial class Matrix<T> : IDisposable
         ThrowIfDisposed();
 
         var tasks = new List<Task>();
-        for (uint row = 0; row < _rows; row++)
+        for (uint x = 0; x < _width; x++)
         {
-            for (uint col = 0; col < _columns; col++)
+            for (uint col = 0; col < _height; col++)
             {
-                uint r = row, c = col;
+                uint r = x, c = col;
                 
                 tasks.Add(Task.Run(async () =>
                 {
@@ -151,37 +152,51 @@ public partial class Matrix<T> : IDisposable
     
 
     /// <summary>
-    /// Get row
+    /// Get column
     /// </summary>
-    public T[] GetRow(uint rowIndex)
+    public T[] GetColumn(uint xIndex)
     {
         ThrowIfDisposed();
         
-        if (rowIndex >= _rows)
-            throw new IndexOutOfRangeException($"{rowIndex}");
+        if (xIndex >= _width)
+            throw new IndexOutOfRangeException($"{xIndex}");
 
-        var row = new T[_columns];
-        for (uint col = 0; col < _columns; col++)
-            row[col] = Get(rowIndex, col);
-        return row;
+        var x = new T[_height];
+        for (uint col = 0; col < _height; col++)
+            x[col] = Get(xIndex, col);
+        return x;
     }
 
     /// <summary>
-    /// Get column
+    /// Get row
     /// </summary>
-    public T[] GetColumn(uint columnIndex)
+    public T[] GetRow(uint yIndex)
     {
         ThrowIfDisposed();
         
-        if (columnIndex >= _columns)
-            throw new IndexOutOfRangeException($"{columnIndex}");
+        if (yIndex >= _height)
+            throw new IndexOutOfRangeException($"{yIndex}");
         
-        var column = new T[_rows];
-        for (uint row = 0; row < _rows; row++)
-            column[row] = Get(row, columnIndex);
-        return column;
+        var y = new T[_width];
+        for (uint x = 0; x < _width; x++)
+            y[x] = Get(x, yIndex);
+        return y;
     }
     
+    public T[,] To2DArray()
+    {
+        ThrowIfDisposed();
+
+        _lock.EnterWriteLock();
+        try
+        {
+            return (T[,])_data.Clone();
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
     
     public override string ToString()
     {
@@ -189,20 +204,21 @@ public partial class Matrix<T> : IDisposable
             return "[Matrix disposed]";
 
         var sb = new StringBuilder();
-        sb.AppendLine($"Matrix<{typeof(T).Name}> ({_rows}x{_columns})");
+        sb.AppendLine($"Matrix<{typeof(T).Name}> ({_width}x{_height})");
         
-        for (uint row = 0; row < _rows; row++)
+        for (uint x = 0; x < _width; x++)
         {
             sb.Append("[ ");
-            for (uint col = 0; col < _columns; col++)
+            for (uint col = 0; col < _height; col++)
             {
-                sb.Append(Get(row, col)).Append(' ');
+                sb.Append(Get(x, col)).Append(' ');
             }
             sb.AppendLine("]");
         }
 
         return sb.ToString();
     }
+    
 
     /// <summary>
     /// For correct clean up locks
@@ -220,8 +236,7 @@ public partial class Matrix<T> : IDisposable
 
         if (disposing)
         {
-            foreach (var @lock in _locks)
-                @lock.Dispose();
+            _lock.Dispose();
         }
 
         _disposed = true;
@@ -236,22 +251,13 @@ public partial class Matrix<T> : IDisposable
     }
     
     
-    private ReaderWriterLockSlim GetElementLock(uint row, uint column)
+    private void ValidateIndices(uint x, uint y)
     {
-        ThrowIfDisposed();
-        ValidateIndices(row, column);
+        if (x >= _width)
+            throw new IndexOutOfRangeException($"{x}");
 
-        return _locks[(row + column) % LocksCount];
-    }
-
-    
-    private void ValidateIndices(uint row, uint column)
-    {
-        if (row >= _rows)
-            throw new IndexOutOfRangeException($"{row}");
-
-        if (column >= _columns)
-            throw new IndexOutOfRangeException($"{column}");
+        if (y >= _height)
+            throw new IndexOutOfRangeException($"{y}");
     }
     
     /// <summary>

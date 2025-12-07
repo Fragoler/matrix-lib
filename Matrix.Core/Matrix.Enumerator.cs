@@ -16,23 +16,23 @@ public partial class Matrix<T>
 public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>, ICloneable
     where T : notnull
 {
-    private uint _column = 0, _row = 0;
+    private uint _x = 0, _y = 0;
 
-    public T Current => matrix.Get(_row, _column);
+    public T Current => matrix.Get(_y, _x);
     object IEnumerator.Current => Current;
 
     public bool MoveNext()
     {
-        if (_column + 1 != matrix.Columns)
+        if (_x + 1 != matrix.Width)
         {
-            ++_column;
+            ++_x;
             return true;
         }
 
-        if (_row + 1 != matrix.Rows)
+        if (_y + 1 != matrix.Height)
         {
-            _column = 0;
-            ++_row;
+            _x = 0;
+            ++_y;
             return true;
         }
 
@@ -40,7 +40,7 @@ public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>, ICloneable
     }
 
     public void Reset() =>
-        _row = _column = 0;
+        _y = _x = 0;
 
     public IList<T> ToList()
     {
@@ -60,8 +60,8 @@ public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>, ICloneable
     {
         return new MatrixEnumerator<T>(matrix)
         {
-            _column = _column,
-            _row = _row
+            _x = _x,
+            _y = _y
         };
     }
 
