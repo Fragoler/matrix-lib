@@ -18,7 +18,7 @@ public class MatrixEnumerator<T>(Matrix<T> matrix) : IEnumerator<T>, ICloneable
 {
     private uint _x = 0, _y = 0;
 
-    public T Current => matrix.Get(_y, _x);
+    public T Current => matrix.Get(_x, _y);
     object IEnumerator.Current => Current;
 
     public bool MoveNext()

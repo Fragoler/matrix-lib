@@ -14,23 +14,23 @@ public class MatrixTests
     public void Constructor_ValidDimensions_ShouldCreateMatrix()
     {
         // Arrange
-        const int rows = 5;
-        const int columns = 10;
+        const int width = 5;
+        const int height = 10;
 
         // Act
-        var matrix = new Matrix<int>(rows, columns);
+        var matrix = new Matrix<int>(width, height);
 
         // Assert
-        matrix.Rows.Should().Be(rows);
-        matrix.Columns.Should().Be(columns);
+        matrix.Width.Should().Be(width);
+        matrix.Height.Should().Be(height);
     }
 
     [Theory]
     [InlineData(0, 5)]
     [InlineData(5, 0)]
-    public void Constructor_InvalidDimensions_ShouldThrowException(uint rows, uint columns)
+    public void Constructor_InvalidDimensions_ShouldThrowException(uint width, uint height)
     {
-        Action act = () => _ = new Matrix<int>(rows, columns);
+        Action act = () => _ = new Matrix<int>(width, height);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -44,8 +44,8 @@ public class MatrixTests
         var matrix = new Matrix<int>(data);
 
         // Assert
-        matrix.Rows.Should().Be(3);
-        matrix.Columns.Should().Be(2);
+        matrix.Width.Should().Be(3);
+        matrix.Height.Should().Be(2);
         matrix.Get(0, 0).Should().Be(1);
         matrix.Get(1, 1).Should().Be(4);
     }
@@ -133,9 +133,9 @@ public class MatrixTests
     public void GetRow_ShouldReturnRowData()
     {
         // Arrange
-        var matrix = new Matrix<uint>(3, 4);
+        var matrix = new Matrix<uint>(4, 3);
         for (uint col = 0; col < 4; col++)
-            matrix.Set(1, col, col + 10);
+            matrix.Set(col, 1, col + 10);
 
         // Act
         var row = matrix.GetRow(1);
@@ -151,7 +151,7 @@ public class MatrixTests
         // Arrange
         var matrix = new Matrix<uint>(3, 3);
         for (uint row = 0; row < 3; row++)
-            matrix.Set(row, 2, row * 5);
+            matrix.Set(2, row, row * 5);
 
         // Act
         var column = matrix.GetColumn(2);
@@ -189,11 +189,11 @@ public class MatrixTests
         // Arrange
         var matrix = new Matrix<uint>(2, 3);
         for (uint i = 0; i < 6; i++)
-            matrix.Set(i / 3, i % 3, i + 1);
+            matrix.Set(i % 2, i / 2, i + 1);
 
         // Act
         using var matrixEnum = matrix.GetEnumerator();
-        var list =  matrixEnum.ToList();
+        var list = matrixEnum.ToList();
         
         // Assert
         list.Should().HaveCount(6);
