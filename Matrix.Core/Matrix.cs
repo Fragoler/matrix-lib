@@ -90,8 +90,17 @@ public partial class Matrix<T> : IDisposable
     }
     
     /// <summary>
-    /// Set element 
+    /// Sets the element at the specified position.
     /// </summary>
+    /// <param name="x">Column index.</param>
+    /// <param name="y">Row index.</param>
+    /// <param name="value">Value to assign.</param>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when indices are outside matrix bounds.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public void Set(uint x, uint y, T value)
     {
         ThrowIfDisposed();
@@ -108,6 +117,18 @@ public partial class Matrix<T> : IDisposable
         }
     }
     
+    
+    /// <summary>
+    /// Gets or sets the element at the specified position.
+    /// </summary>
+    /// <param name="x">Column index.</param>
+    /// <param name="y">Row index.</param>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when indices are outside matrix bounds.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public T this[uint x, uint y]
     {
         get => Get(x, y);
@@ -116,8 +137,18 @@ public partial class Matrix<T> : IDisposable
     
     
     /// <summary>
-    /// Fill async
+    /// Asynchronously fills the matrix using the provided factory function.
     /// </summary>
+    /// <param name="factory">
+    /// Function that produces a value for a given (x, y) position.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Token to observe for cancellation.
+    /// </param>
+    /// <returns>A task that represents the fill operation.</returns>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public Task FillAsync(Func<uint, uint, T> factory, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -147,8 +178,18 @@ public partial class Matrix<T> : IDisposable
     }
 
     /// <summary>
-    /// For each do action
+    /// Asynchronously executes an action for each element in the matrix.
     /// </summary>
+    /// <param name="action">
+    /// Asynchronous action that receives position and value.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Token to observe for cancellation.
+    /// </param>
+    /// <returns>A task that represents the iteration operation.</returns>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public Task ForEachAsync(Func<uint, uint, T, Task> action, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -179,8 +220,16 @@ public partial class Matrix<T> : IDisposable
     }
 
     /// <summary>
-    /// Get column
+    /// Returns all elements of the specified column.
     /// </summary>
+    /// <param name="xIndex">Column index.</param>
+    /// <returns>Array containing the column values.</returns>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when xIndex is outside matrix bounds.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public T[] GetColumn(uint xIndex)
     {
         ThrowIfDisposed();
@@ -203,8 +252,16 @@ public partial class Matrix<T> : IDisposable
     }
 
     /// <summary>
-    /// Get row
+    /// Returns all elements of the specified row.
     /// </summary>
+    /// <param name="yIndex">Row index.</param>
+    /// <returns>Array containing the row values.</returns>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when yIndex is outside matrix bounds.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public T[] GetRow(uint yIndex)
     {
         ThrowIfDisposed();
@@ -226,6 +283,13 @@ public partial class Matrix<T> : IDisposable
         }
     }
     
+    /// <summary>
+    /// Returns a cloned 2D array with the matrix contents.
+    /// </summary>
+    /// <returns>New 2D array with matrix data.</returns>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>s
     public T[,] To2DArray()
     {
         ThrowIfDisposed();
@@ -241,6 +305,13 @@ public partial class Matrix<T> : IDisposable
         }
     }
     
+    /// <summary>
+    /// Returns a string representation of the matrix contents.
+    /// </summary>
+    /// <returns>Human-readable matrix representation.</returns>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public override string ToString()
     {
         ThrowIfDisposed();
@@ -272,7 +343,7 @@ public partial class Matrix<T> : IDisposable
     
 
     /// <summary>
-    /// For correct clean up locks
+    /// Releases all resources used by the matrix.
     /// </summary>
     public void Dispose()
     {
@@ -280,6 +351,12 @@ public partial class Matrix<T> : IDisposable
         GC.SuppressFinalize(this);
     }
     
+    /// <summary>
+    /// Releases unmanaged resources and optionally managed resources.
+    /// </summary>
+    /// <param name="disposing">
+    /// True to release managed resources; false to release only unmanaged.
+    /// </param>
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed)
@@ -294,7 +371,7 @@ public partial class Matrix<T> : IDisposable
     }
 
     /// <summary>
-    /// Finalizer
+    /// Finalizer that ensures resources are released if Dispose was not called.
     /// </summary>
     ~Matrix()
     {
@@ -302,6 +379,14 @@ public partial class Matrix<T> : IDisposable
     }
     
     
+    /// <summary>
+    /// Validates that the given indices are within matrix bounds.
+    /// </summary>
+    /// <param name="x">Column index.</param>
+    /// <param name="y">Row index.</param>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when indices are outside matrix bounds.
+    /// </exception>
     private void ValidateIndices(uint x, uint y)
     {
         if (x >= _width)
@@ -312,13 +397,14 @@ public partial class Matrix<T> : IDisposable
     }
     
     /// <summary>
-    /// Check if object has already disposed
+    /// Throws if the matrix has already been disposed.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     private void ThrowIfDisposed()
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(Matrix<T>), "Matrix was disposed");
     }
-
-
 }
