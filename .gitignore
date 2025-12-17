@@ -267,3 +267,7 @@ __pycache__/
 
 # Cake - Uncomment if you are using it
 # tools/
+
+# Benchmark results
+*BenchmarkDotNet.Artifacts/
+*.png
