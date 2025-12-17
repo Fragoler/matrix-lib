@@ -8,8 +8,6 @@
 public partial class Matrix<T> : IDisposable
     where T : notnull
 {
-    private const uint LocksCount = 16;
-    
     private readonly T[,] _data;
     private readonly uint _width;
     private readonly uint _height;
@@ -102,54 +100,65 @@ public partial class Matrix<T> : IDisposable
     /// <summary>
     /// Fill async
     /// </summary>
-    public async Task FillAsync(Func<uint, uint, T> factory, CancellationToken cancellationToken = default)
+    public Task FillAsync(Func<uint, uint, T> factory, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
-        var tasks = new List<Task>();
-        for (uint x = 0; x < _width; x++)
+        return Task.Run(() =>
         {
-            for (uint col = 0; col < _height; col++)
-            {
-                uint r = x, c = col;
-                
-                tasks.Add(Task.Run(() =>
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Set(r, c, factory(r, c));
-                }, cancellationToken));
-            }
-        }
+            _lock.EnterWriteLock();
 
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+            try
+            {
+                Parallel.For(0, (int)_width, new ParallelOptions
+                {
+                    CancellationToken = cancellationToken
+                }, x =>
+                {
+                    for (uint y = 0; y < _height; y++)
+                    {
+                        _data[x, y] = factory((uint)x, y);
+                    }
+                });
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }, cancellationToken);
     }
-    
+
     /// <summary>
     /// For each do action
     /// </summary>
-    public async Task ForEachAsync(Func<uint, uint, T, Task> action, CancellationToken cancellationToken = default)
+    public Task ForEachAsync(Func<uint, uint, T, Task> action, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
-        var tasks = new List<Task>();
-        for (uint x = 0; x < _width; x++)
+        return Task.Run(async () =>
         {
-            for (uint col = 0; col < _height; col++)
-            {
-                uint r = x, c = col;
-                
-                tasks.Add(Task.Run(async () =>
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var value = Get(r, c);
-                    await action(r, c, value).ConfigureAwait(false);
-                }, cancellationToken));
-            }
-        }
+            _lock.EnterWriteLock();
 
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+            try
+            {
+                var tasks = new List<Task>((int)(_width * _height));
+                for (uint x = 0; x < _width; x++)
+                {
+                    for (uint y = 0; y < _height; y++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        tasks.Add(action(x, y, _data[x, y]));
+                    }
+                }
+
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }, cancellationToken);
     }
-    
 
     /// <summary>
     /// Get column
@@ -161,10 +170,18 @@ public partial class Matrix<T> : IDisposable
         if (xIndex >= _width)
             throw new IndexOutOfRangeException($"{xIndex}");
 
-        var x = new T[_height];
-        for (uint col = 0; col < _height; col++)
-            x[col] = Get(xIndex, col);
-        return x;
+        _lock.EnterWriteLock();
+        try
+        {
+            var x = new T[_height];
+            for (uint y = 0; y < _height; y++)
+                x[y] = _data[xIndex, y];
+            return x;
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     /// <summary>
@@ -177,10 +194,18 @@ public partial class Matrix<T> : IDisposable
         if (yIndex >= _height)
             throw new IndexOutOfRangeException($"{yIndex}");
         
-        var y = new T[_width];
-        for (uint x = 0; x < _width; x++)
-            y[x] = Get(x, yIndex);
-        return y;
+        _lock.EnterWriteLock();
+        try
+        {
+            var row = new T[_width];
+            for (uint x = 0; x < _width; x++)
+                row[x] = _data[x, yIndex];
+            return row;
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
     
     public T[,] To2DArray()
@@ -200,23 +225,35 @@ public partial class Matrix<T> : IDisposable
     
     public override string ToString()
     {
-        if (_disposed)
-            return "[Matrix disposed]";
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"Matrix<{typeof(T).Name}> ({_width}x{_height})");
-        
-        for (uint x = 0; x < _width; x++)
+        try
         {
-            sb.Append("[ ");
-            for (uint col = 0; col < _height; col++)
+            _lock.EnterWriteLock();
+            try
             {
-                sb.Append(Get(x, col)).Append(' ');
-            }
-            sb.AppendLine("]");
-        }
+                var sb = new StringBuilder();
+                sb.AppendLine($"Matrix<{typeof(T).Name}> ({_width}x{_height})");
+            
+                for (uint x = 0; x < _width; x++)
+                {
+                    sb.Append("[ ");
+                    for (uint col = 0; col < _height; col++)
+                    {
+                        sb.Append(_data[x, col]).Append(' ');
+                    }
+                    sb.AppendLine("]");
+                }
 
-        return sb.ToString();
+                return sb.ToString();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            return "[Matrix disposed]";
+        }
     }
     
 
@@ -233,13 +270,13 @@ public partial class Matrix<T> : IDisposable
     {
         if (_disposed)
             return;
+        _disposed = true;
+
 
         if (disposing)
         {
             _lock.Dispose();
         }
-
-        _disposed = true;
     }
 
     /// <summary>
