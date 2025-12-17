@@ -3,10 +3,9 @@ using Matrix.Core;
 
 namespace Matrix.Tests;
 
-
 /// <summary>
-/// Unit tests for Matrix{T}
-/// Use xUnit and FluentAssertions
+///     Unit tests for Matrix{T}
+///     Use xUnit and FluentAssertions
 /// </summary>
 public class MatrixTests
 {
@@ -38,7 +37,7 @@ public class MatrixTests
     public void Constructor_WithArray_ShouldInitializeMatrix()
     {
         // Arrange
-        var data = new [,] { { 1, 2 }, { 3, 4 }, { 5, 6 } };
+        var data = new[,] { { 1, 2 }, { 3, 4 }, { 5, 6 } };
 
         // Act
         var matrix = new Matrix<int>(data);
@@ -74,7 +73,7 @@ public class MatrixTests
 
         // Act
         Action act = () => matrix.Get(row, column);
-        
+
         // Assert
         act.Should().Throw<IndexOutOfRangeException>();
     }
@@ -103,30 +102,30 @@ public class MatrixTests
         // Act
         uint index = 0;
         for (uint row = 0; row < 3; row++)
-            for (uint col = 0; col < 3; col++)
-                matrix.Set(row, col, values[index++]);
+        for (uint col = 0; col < 3; col++)
+            matrix.Set(row, col, values[index++]);
 
         // Assert
         index = 0;
         for (uint row = 0; row < 3; row++)
-            for (uint col = 0; col < 3; col++)
-                matrix.Get(row, col).Should().Be(values[index++]);
+        for (uint col = 0; col < 3; col++)
+            matrix.Get(row, col).Should().Be(values[index++]);
     }
-    
-    
+
+
     [Fact]
     public async Task FillAsync_ShouldPopulateAllElements()
     {
         // Arrange
         var matrix = new Matrix<uint>(3, 3);
-        
+
         // Act
-        await matrix.FillAsync( (row, col) => row * 3 + col);
+        await matrix.FillAsync((row, col) => row * 3 + col);
 
         // Assert
         for (uint row = 0; row < 3; row++)
-            for (uint col = 0; col < 3; col++)
-                matrix.Get(row, col).Should().Be(row * 3 + col);
+        for (uint col = 0; col < 3; col++)
+            matrix.Get(row, col).Should().Be(row * 3 + col);
     }
 
     [Fact]
@@ -194,10 +193,16 @@ public class MatrixTests
         // Act
         using var matrixEnum = matrix.GetEnumerator();
         var list = matrixEnum.ToList();
-        
+        matrixEnum.MoveNext();
+
         // Assert
         list.Should().HaveCount(6);
         list.Should().Equal(1, 2, 3, 4, 5, 6);
+        
+        
+        matrixEnum.Current.Should().Be(2);
+        matrixEnum.Reset();
+        matrixEnum.Current.Should().Be(1);
     }
 
     [Fact]
@@ -227,7 +232,7 @@ public class MatrixTests
         str.Should().Contain("Matrix<Int32>");
         str.Should().Contain("3x3");
     }
-    
+
     [Fact]
     public void IDisposable_UsingStatement_ShouldDisposeCorrectly()
     {
@@ -238,6 +243,96 @@ public class MatrixTests
             matrix.Set(0, 0, 5);
         };
 
+        act.Should().NotThrow();
+    }
+    
+    [Fact]
+    public void Brackets_ShouldGetCell()
+    {
+        // Arrange
+        var matrix = new Matrix<uint>(4, 3);
+        for (uint col = 0; col < 4; col++)
+            matrix.Set(col, 1, col + 10);
+
+        // Act
+        var val = matrix[2, 1];
+
+        // Assert
+        val.Should().Be(12);
+    }
+    
+    [Fact]
+    public void Brackets_ShouldSetCell()
+    {
+        // Arrange
+        var matrix = new Matrix<uint>(4, 3);
+        for (uint col = 0; col < 4; col++)
+            matrix.Set(col, 1, col + 10);
+
+        // Act
+        matrix[2, 1] = 1000;
+
+        // Assert
+        matrix.Get(2, 1).Should().Be(1000);
+    }
+    
+    
+    [Fact]
+    public async Task ForEachAsync_ShouldDoSomething()
+    {
+        // Arrange
+        var matrix = new Matrix<uint>(4, 3);
+        for (uint col = 0; col < 4; col++)
+            matrix.Set(col, 1, 1);
+
+        // Act
+        var cnt = 0;
+        await matrix.ForEachAsync((_, _, _) =>
+        {
+            Interlocked.Increment(ref cnt); 
+            return Task.CompletedTask;
+        }, CancellationToken.None);
+        
+        // Assert
+        cnt.Should().Be(12);
+    }
+    
+    
+    [Fact]
+    public void To2DArrayAsync_ShouldReturn2DArray()
+    {
+        // Arrange
+        var matrix = new Matrix<uint>(4, 3);
+        for (uint x = 0; x < 4; x++)
+        for (uint y = 0; y < 3; y++)
+            matrix.Set(x, y, x + y);
+
+        // Act
+        var array = matrix.To2DArray();
+        
+        // Assert
+        for (uint x = 0; x < 4; x++)
+        for (uint y = 0; y < 3; y++)
+            array[x, y].Should().Be(x + y);
+    }
+    
+    
+        
+    [Fact]
+    public void DoubleDispose_ShouldWorkCorrectly()
+    {
+        // Act
+        var act = () =>
+        {
+            var matrix = new Matrix<uint>(4, 3);
+
+            matrix.Dispose();
+            matrix.Dispose();
+
+            GC.Collect();
+        };
+
+        // Assert
         act.Should().NotThrow();
     }
 }

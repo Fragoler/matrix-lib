@@ -14,10 +14,15 @@ public partial class Matrix<T> : IDisposable
     private readonly ReaderWriterLockSlim _lock = new();
     private volatile bool _disposed;
 
+    
     /// <summary>
-    /// Init matrix width * height with default value
+    /// Initializes a new matrix with the specified dimensions and default values.
     /// </summary>
-    /// <exception cref="ArgumentException">Thrown if at least one argument is not positive</exception>
+    /// <param name="width">Number of columns.</param>
+    /// <param name="height">Number of rows.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when width or height is zero.
+    /// </exception>
     public Matrix(uint width, uint height)
     {
         if (width == 0 || height == 0)
@@ -29,10 +34,12 @@ public partial class Matrix<T> : IDisposable
     }
 
     /// <summary>
-    /// Init matrix with already init data
+    /// Initializes a new matrix from an existing 2D array copy.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if data is null</exception>
-    /// <exception cref="ArgumentException">Thrown if data has one 0 dimension</exception>
+    /// <param name="data">Source 2D array.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when data is null.
+    /// </exception>
     public Matrix(T[,] data)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -40,21 +47,32 @@ public partial class Matrix<T> : IDisposable
         _width = Convert.ToUInt32(data.GetLength(0));
         _height = Convert.ToUInt32(data.GetLength(1));
 
-        if (_width == 0 || _height == 0)
-            throw new ArgumentException("Array should have any data");
-
         _data = (T[,])data.Clone();
     }
     
-    
+    /// <summary>
+    /// Gets the matrix width (number of columns).
+    /// </summary>
     public uint Width => _width;
+    
+    /// <summary>
+    /// Gets the matrix height (number of rows).
+    /// </summary>
     public uint Height => _height;
     
 
     /// <summary>
-    /// Get element
+    /// Returns the element at the specified position.
     /// </summary>
-    /// <exception cref="IndexOutOfRangeException"></exception>
+    /// <param name="x">Column index.</param>
+    /// <param name="y">Row index.</param>
+    /// <returns>Element at (x, y).</returns>
+    /// <exception cref="IndexOutOfRangeException">
+    /// Thrown when indices are outside matrix bounds.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the matrix has been disposed.
+    /// </exception>
     public T Get(uint x, uint y)
     {
         ThrowIfDisposed();
@@ -225,34 +243,30 @@ public partial class Matrix<T> : IDisposable
     
     public override string ToString()
     {
+        ThrowIfDisposed();
+        
+        _lock.EnterWriteLock();
         try
         {
-            _lock.EnterWriteLock();
-            try
+            var sb = new StringBuilder();
+            sb.AppendLine($"Matrix<{typeof(T).Name}> ({_width}x{_height})");
+
+            for (uint x = 0; x < _width; x++)
             {
-                var sb = new StringBuilder();
-                sb.AppendLine($"Matrix<{typeof(T).Name}> ({_width}x{_height})");
-            
-                for (uint x = 0; x < _width; x++)
+                sb.Append("[ ");
+                for (uint col = 0; col < _height; col++)
                 {
-                    sb.Append("[ ");
-                    for (uint col = 0; col < _height; col++)
-                    {
-                        sb.Append(_data[x, col]).Append(' ');
-                    }
-                    sb.AppendLine("]");
+                    sb.Append(_data[x, col]).Append(' ');
                 }
 
-                return sb.ToString();
+                sb.AppendLine("]");
             }
-            finally
-            {
-                _lock.ExitWriteLock();
-            }
+
+            return sb.ToString();
         }
-        catch (ObjectDisposedException)
+        finally
         {
-            return "[Matrix disposed]";
+            _lock.ExitWriteLock();
         }
     }
     
